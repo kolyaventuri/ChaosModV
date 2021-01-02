@@ -1,4 +1,5 @@
 #include <stdafx.h>
+#include <set>
 
 static Hash highEndVehs[48] = {
 	2983812512, 3003014393, 418536135, 2598821281, 2672523198, 3078201489, 338562499, 819197656, 2067820283, 3062131285,
@@ -8,7 +9,7 @@ static Hash highEndVehs[48] = {
 	1591739866, 3630826055, 3970348707, 1044193113, 3612858749, 1323778901, 960812448, 2936769864
 };
 
-static void replaceVehicle(Vehicle veh) {
+static void replaceVehicle(Vehicle veh, Hash model) {
 	if (IS_ENTITY_A_MISSION_ENTITY(veh)) return; // (kolyaventuri): Don't replace critial entities
 
 	float heading;
@@ -39,11 +40,9 @@ static void replaceVehicle(Vehicle veh) {
 	SET_ENTITY_AS_MISSION_ENTITY(veh, true, true);
 	DELETE_VEHICLE(&veh);
 
-	// (kolyaventuri): Get a new vehicle
-	Hash randomVeh = highEndVehs[g_random.GetRandomInt(0, 48)];
-	LoadModel(randomVeh);
-	Vehicle newVeh = CREATE_VEHICLE(randomVeh, coords.x, coords.y, coords.z + 1.f, heading, true, true, true);
-	int newSeats = GET_VEHICLE_MODEL_NUMBER_OF_SEATS(GET_ENTITY_MODEL(newVeh));
+	// (kolyaventuri): Create a new vehicle
+	Vehicle newVeh = CREATE_VEHICLE(model, coords.x, coords.y, coords.z + 1.f, heading, true, true, true);
+	int newSeats = GET_VEHICLE_MODEL_NUMBER_OF_SEATS(model);
 
 	// (kolyaventuri): Refill the vehicle
 	for (int i = 0; i < vehPeds.size(); i++) {
@@ -65,15 +64,35 @@ static void replaceVehicle(Vehicle veh) {
 	}
 	SET_ENTITY_VELOCITY(newVeh, velocity.x, velocity.y, velocity.z);
 	SET_VEHICLE_FORWARD_SPEED(newVeh, forwardSpeed);
-
-	SET_MODEL_AS_NO_LONGER_NEEDED(randomVeh);
 }
 
 static void OnStart() {
-	for (Vehicle veh : GetAllVehs()) {
+	// (kolyaventuri): Preload all models
+	std::vector<Hash> models;
+	const std::vector<Vehicle> vehicles = GetAllVehs();
+	for (Vehicle veh : vehicles) {
+		Hash randomVeh = highEndVehs[g_random.GetRandomInt(0, 48)];
+		models.push_back(randomVeh);
+	}
+
+	std::set<Hash> uniqModels(models.begin(), models.end());
+	for (Hash model : uniqModels) {
+		LoadModel(model);
+	}
+
+	for (int i = 0; i < vehicles.size(); i++) {
+		Vehicle veh = vehicles[i];
+		Hash model = models[i];
 		if (!IS_PED_IN_VEHICLE(PLAYER_PED_ID(), veh, false)) {
-			replaceVehicle(veh);
+			WAIT(2);
+			replaceVehicle(veh, model);
 		}
+	}
+
+
+	// (kolyaventuri): Clean up models
+	for (Hash model : uniqModels) {
+		SET_MODEL_AS_NO_LONGER_NEEDED(model);
 	}
 }
 
