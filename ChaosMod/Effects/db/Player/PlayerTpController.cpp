@@ -320,3 +320,106 @@ static RegisterEffect registerEffectFake(EFFECT_TP_FAKE, OnStartFakeTp, EffectIn
 		.Id = "tp_fake"
 	}
 );
+
+static void OnStartFakeTPWaypoint() {
+	g_pEffectDispatcher->OverrideEffectName(EFFECT_FAKE_TP_WAYPOINT, EFFECT_TP_WAYPOINT);
+
+	Hooks::EnableScriptThreadBlock();
+
+	Ped playerPed = PLAYER_PED_ID();
+	Vector3 playerPos = GET_ENTITY_COORDS(playerPed, false);
+	Vehicle playerVeh = IS_PED_IN_ANY_VEHICLE(playerPed, false) ? GET_VEHICLE_PED_IS_IN(playerPed, false) : 0;
+
+	WAIT(0);
+
+	SET_ENTITY_INVINCIBLE(playerPed, true);
+	if (playerVeh)
+	{
+		SET_ENTITY_INVINCIBLE(playerVeh, true);
+	}
+
+	Vector3 coords;
+	bool found = false;
+	bool playerBlip = false;
+	if (IS_WAYPOINT_ACTIVE())
+	{
+		coords = GET_BLIP_COORDS(GET_FIRST_BLIP_INFO_ID(8));
+		found = true;
+		playerBlip = true;
+	}
+	else
+	{
+		for (int i = 0; i < 3; i++)
+		{
+			Blip blip = GET_FIRST_BLIP_INFO_ID(i);
+			if (DOES_BLIP_EXIST(blip))
+			{
+				coords = GET_BLIP_COORDS(blip);
+				found = true;
+
+				break;
+			}
+		}
+	}
+
+	if (found)
+	{
+		float z;
+		if (!playerBlip)
+		{
+			z = coords.z;
+		}
+		else
+		{
+			float groundZ;
+			bool useGroundZ;
+			for (int i = 0; i < 100; i++)
+			{
+				float testZ = (i * 10.f) - 100.f;
+
+				TeleportPlayer(coords.x, coords.y, testZ);
+				if (i % 5 == 0)
+				{
+					WAIT(0);
+				}
+
+				useGroundZ = GET_GROUND_Z_FOR_3D_COORD(coords.x, coords.y, testZ, &groundZ, false, false);
+				if (useGroundZ)
+				{
+					break;
+				}
+			}
+
+			if (useGroundZ)
+			{
+				z = groundZ;
+			}
+			else
+			{
+				Vector3 playerPos = GET_ENTITY_COORDS(playerPed, false);
+
+				z = playerPos.z;
+			}
+		}
+
+		TeleportPlayer(coords.x, coords.y, z);
+
+		WAIT(g_Random.GetRandomInt(3500, 6000));
+
+		SET_ENTITY_INVINCIBLE(playerPed, false);
+		if (playerVeh)
+		{
+			SET_ENTITY_INVINCIBLE(playerVeh, false);
+		}
+		TeleportPlayer(playerPos);
+	}
+
+	Hooks::DisableScriptThreadBlock();
+}
+
+static RegisterEffect registerEffectFakeWaypoint(EFFECT_FAKE_TP_WAYPOINT, OnStartFakeTPWaypoint, EffectInfo
+	{
+		.Name = "Fake Teleport To Waypoint",
+		.Id = "tp_fake_waypoint"
+	}
+);
